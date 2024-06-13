@@ -21,4 +21,3 @@ subprocess.check_call([sys.executable, "-m", "pip", "install", "torch-sparse", "
 subprocess.check_call([sys.executable, "-m", "pip", "install", "torch-cluster", "-f", f"https://data.pyg.org/whl/torch-{TORCH}+{CUDA}.html"])
 subprocess.check_call([sys.executable, "-m", "pip", "install", "torch-spline-conv", "-f", f"https://data.pyg.org/whl/torch-{TORCH}+{CUDA}.html"])
 subprocess.check_call([sys.executable, "-m", "pip", "install", "torch-geometric"])
-subprocess.check_call([sys.executable, "-m", "pip", "install", "torch-geometric"])
