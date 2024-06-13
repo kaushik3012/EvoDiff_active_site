@@ -92,7 +92,7 @@ def main(path, n_sample_query, K_generate, model_name):
             for j, seq in enumerate(generated_seqs):
                 f.write(">" + f'GENERATED_SEQUENCE_{i}_{j}' + "\n" + seq + "\n\n")
 
-    print('Saved the Generated Sequences in generated_sequences as fasta files!')
+    print('Saved the Generated Sequences in generated_seqs as fasta files!')
 
 if __name__== "__main__":
     parser = argparse.ArgumentParser(description ='Generate Protein Sequences using EvoDiff and Active Site Data')
