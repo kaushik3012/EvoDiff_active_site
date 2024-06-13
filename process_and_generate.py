@@ -4,6 +4,9 @@ import torch
 from evodiff.conditional_generation import inpaint_multiple_regions
 from collections import defaultdict
 import pickle as pkl
+import os
+import shutil
+import argparse
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -36,8 +39,11 @@ def prepare_indices(start_ids, end_ids, device=device):
     end_idxs = torch.tensor(end_ids).to(device)
     return start_idxs, end_idxs
 
-def generate_sequences(df, model='OADM_38M'):
-    checkpoint = OA_DM_38M()
+def generate_sequences(df, K, model_name):
+    if model_name == 'OADM_640M':
+        checkpoint = OA_DM_640M()
+    else:
+        checkpoint = OA_DM_38M()
     model, collater, tokenizer, scheme = checkpoint
     model.to(device)
 
@@ -52,10 +58,10 @@ def generate_sequences(df, model='OADM_38M'):
     # Tokenize the masked sequences
     tokenized_sequences = tokenize_sequences(masked_sequences, tokenizer, device)
 
-    sequences = [ele for ele in sequences for i in range(5)]
-    tokenized_sequences = [ele for ele in tokenized_sequences for i in range(5)]
-    start_ids = [ele for ele in start_ids for i in range(5)]
-    end_ids = [ele for ele in end_ids for i in range(5)]
+    sequences = [ele for ele in sequences for i in range(K)]
+    tokenized_sequences = [ele for ele in tokenized_sequences for i in range(K)]
+    start_ids = [ele for ele in start_ids for i in range(K)]
+    end_ids = [ele for ele in end_ids for i in range(K)]
 
     untokenized_seqs, sequences, untokenized_idrs, sequences_idrs, save_starts, save_ends = inpaint_multiple_regions(model, tokenized_sequences, start_ids, end_ids, sequences, tokenizer)
 
@@ -67,17 +73,45 @@ def generate_sequences(df, model='OADM_38M'):
 
     return generated_map
     
-def main():
+def main(path, n_sample_query, K_generate, model_name):
     activesite_path = '/content/uniprotkb_active_site_AND_reviewed_true_2024_05_31.xlsx'
     df = load_activesite_data(activesite_path)
 
-    df_sub = df.sample(n=100, random_state=42)
-    generated_map = generate_sequences(df_sub)
-    
-    with open('generated_sequences.pkl', 'wb') as f:
-        pkl.dump(dict(generated_map), f)
+    df_sub = df.sample(n=n_sample_query, random_state=42)
+    generated_map = generate_sequences(df_sub, K_generate, model_name)
+    query_seqs = generated_map.keys()
 
-    print('Saved the Generated Sequences as generated_sequences.pkl!')
+    if os.path.exists('generated_seqs'):
+        shutil.rmtree('generated_seqs')
+    os.makedirs('generated_seqs')
+
+    for i, query_seq in enumerate(query_seqs):
+        generated_seqs = generated_map[query_seq]
+        with open(f'generated_seqs/SEQUENCE_{i}.fasta', "w") as f:
+            f.write(">" + f'QUERY_SEQUENCE_{i}' + "\n" + query_seq + "\n\n")
+            for j, seq in enumerate(generated_seqs):
+                f.write(">" + f'GENERATED_SEQUENCE_{i}_{j}' + "\n" + seq + "\n\n")
+
+    print('Saved the Generated Sequences in generated_sequences as fasta files!')
 
 if __name__== "__main__":
-    main()
+    parser = argparse.ArgumentParser(description ='Generate Protein Sequences using EvoDiff and Active Site Data')
+    parser.add_argument('--path', 
+                        help ='Enter the path to the active site data',
+                        type=str,
+                        required=True)
+    parser.add_argument('-n --n_samples', dest ='n_sample_query', 
+                        type=int,
+                        required=True,
+                        help ='Enter the number of original sequences to sample')
+    parser.add_argument('-k', dest ='K_generate', 
+                        type=int,
+                        default=5,
+                        help ='Enter the number of protein sequences to generate per original sample')
+    parser.add_argument('--model -m', dest ='model_name',
+                        choices = ['OADM_640M', 'OADM_38M'],
+                        default= 'OADM_38M',
+                        help ='Enter the number of protein sequences to generate per original sample')
+         
+    args = parser.parse_args()
+    main(args.path, args.n_sample_query, args.K_generate, args.model_name)
