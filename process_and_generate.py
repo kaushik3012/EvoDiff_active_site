@@ -73,8 +73,7 @@ def generate_sequences(df, K, model_name):
 
     return generated_map
     
-def main(path, n_sample_query, K_generate, model_name):
-    activesite_path = '/content/uniprotkb_active_site_AND_reviewed_true_2024_05_31.xlsx'
+def main(activesite_path, n_sample_query, K_generate, model_name):
     df = load_activesite_data(activesite_path)
 
     df_sub = df.sample(n=n_sample_query, random_state=42)
