@@ -1,12 +1,12 @@
 import pandas as pd
-from evodiff.pretrained import OA_DM_38M, OA_DM_640M
 import torch
+from evodiff.pretrained import OA_DM_38M, OA_DM_640M
 from evodiff.conditional_generation import inpaint_multiple_regions
 from collections import defaultdict
-import pickle as pkl
 import os
 import shutil
 import argparse
+import session_info
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -114,3 +114,4 @@ if __name__== "__main__":
          
     args = parser.parse_args()
     main(args.path, args.n_sample_query, args.K_generate, args.model_name)
+    session_info.show(write_req_file=True, req_file_name='requirements.txt')
