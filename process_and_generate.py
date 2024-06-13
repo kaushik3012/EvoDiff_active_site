@@ -6,7 +6,6 @@ from collections import defaultdict
 import os
 import shutil
 import argparse
-import session_info
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -114,4 +113,3 @@ if __name__== "__main__":
          
     args = parser.parse_args()
     main(args.path, args.n_sample_query, args.K_generate, args.model_name)
-    session_info.show(write_req_file=True, req_file_name='requirements.txt')
