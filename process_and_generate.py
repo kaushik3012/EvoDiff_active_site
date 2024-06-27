@@ -6,6 +6,7 @@ from collections import defaultdict
 import os
 import shutil
 import argparse
+import random
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -38,7 +39,7 @@ def prepare_indices(start_ids, end_ids, device=device):
     end_idxs = torch.tensor(end_ids).to(device)
     return start_idxs, end_idxs
 
-def generate_sequences(df, K, model_name):
+def generate_sequences(df, K, model_name, act_site_on):
     if model_name == 'OADM_640M':
         checkpoint = OA_DM_640M()
     else:
@@ -46,10 +47,13 @@ def generate_sequences(df, K, model_name):
     model, collater, tokenizer, scheme = checkpoint
     model.to(device)
 
-    activesite_idxs = [[(x-1) for x in row] for row in df['Active site'].values.tolist()]
     sequences = df['Sequence'].values.tolist()
-    start_ids = activesite_idxs
-    end_ids = df['Active site'].values.tolist()
+    if act_site_on:
+        start_ids = [[(x-1) for x in row] for row in df['Active site'].values.tolist()]
+        end_ids = df['Active site'].values.tolist()
+    else:
+        start_ids = [random.sample(range(0, len(sequences[i])), k=len(row)) for i, row in enumerate(df['Active site'].values.tolist())]
+        end_ids = [[(x+1) for x in row] for row in df['Active site'].values.tolist()]
 
     # Mask the sequences
     masked_sequences = mask_sequences(sequences, start_ids, end_ids)
@@ -72,11 +76,11 @@ def generate_sequences(df, K, model_name):
 
     return generated_map
     
-def main(activesite_path, n_sample_query, K_generate, model_name):
+def main(activesite_path, n_sample_query, K_generate, model_name, activesite):
     df = load_activesite_data(activesite_path)
 
     df_sub = df.sample(n=n_sample_query, random_state=42)
-    generated_map = generate_sequences(df_sub, K_generate, model_name)
+    generated_map = generate_sequences(df_sub, K_generate, model_name, activesite)
     query_seqs = generated_map.keys()
 
     if os.path.exists('generated_seqs'):
@@ -106,10 +110,11 @@ if __name__== "__main__":
                         type=int,
                         default=5,
                         help ='Enter the number of protein sequences to generate per original sample')
-    parser.add_argument('--model -m', dest ='model_name',
+    parser.add_argument('-m --model', dest ='model_name',
                         choices = ['OADM_640M', 'OADM_38M'],
                         default= 'OADM_38M',
                         help ='Enter the number of protein sequences to generate per original sample')
-         
+    parser.add_argument('-a --activesite', dest="activesite", action='store_true',
+                        help="Toggle Active Site Data integration")
     args = parser.parse_args()
-    main(args.path, args.n_sample_query, args.K_generate, args.model_name)
+    main(args.path, args.n_sample_query, args.K_generate, args.model_name, args.activesite)
