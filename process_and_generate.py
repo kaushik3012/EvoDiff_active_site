@@ -37,9 +37,9 @@ def tokenize_sequences(sequences, tokenizer, device=device):
 def prepare_indices(start_ids, end_ids, device=device):
     start_idxs = torch.tensor(start_ids).to(device)
     end_idxs = torch.tensor(end_ids).to(device)
-    return start_idxs, end_idxs
+    return start_idxs, end_idxs    
 
-def generate_sequences(df, K, model_name, act_site_on):
+def generate_sequences(df, K, model_name, act_site_on, invert):
     if model_name == 'OADM_640M':
         checkpoint = OA_DM_640M()
     else:
@@ -48,13 +48,19 @@ def generate_sequences(df, K, model_name, act_site_on):
     model.to(device)
 
     sequences = df['Sequence'].values.tolist()
+
     if act_site_on:
         start_ids = [[(x-1) for x in row] for row in df['Active site'].values.tolist()]
         end_ids = df['Active site'].values.tolist()
     else:
         start_ids = [random.sample(range(0, len(sequences[i])), k=len(row)) for i, row in enumerate(df['Active site'].values.tolist())]
-        end_ids = [[(x+1) for x in row] for row in df['Active site'].values.tolist()]
-
+        end_ids = [[(x+1) for x in row] for row in start_ids]
+    
+    if invert:
+        temp = start_ids
+        start_ids = [[0] + row for row in end_ids]
+        end_ids = [row + [len(sequences[i])] for i,row in enumerate(temp)]
+    
     # Mask the sequences
     masked_sequences = mask_sequences(sequences, start_ids, end_ids)
 
@@ -76,11 +82,11 @@ def generate_sequences(df, K, model_name, act_site_on):
 
     return generated_map
     
-def main(activesite_path, n_sample_query, K_generate, model_name, activesite):
+def main(activesite_path, n_sample_query, K_generate, model_name, activesite, invert):
     df = load_activesite_data(activesite_path)
 
     df_sub = df.sample(n=n_sample_query, random_state=42)
-    generated_map = generate_sequences(df_sub, K_generate, model_name, activesite)
+    generated_map = generate_sequences(df_sub, K_generate, model_name, activesite, invert)
     query_seqs = generated_map.keys()
 
     if os.path.exists('generated_seqs'):
@@ -102,7 +108,7 @@ if __name__== "__main__":
                         help ='Enter the path to the active site data',
                         type=str,
                         required=True)
-    parser.add_argument('-n --n_samples', dest ='n_sample_query', 
+    parser.add_argument('-n','--n_samples', dest ='n_sample_query', 
                         type=int,
                         required=True,
                         help ='Enter the number of original sequences to sample')
@@ -110,11 +116,13 @@ if __name__== "__main__":
                         type=int,
                         default=5,
                         help ='Enter the number of protein sequences to generate per original sample')
-    parser.add_argument('-m --model', dest ='model_name',
+    parser.add_argument('--model','-m', dest ='model_name',
                         choices = ['OADM_640M', 'OADM_38M'],
                         default= 'OADM_38M',
                         help ='Enter the number of protein sequences to generate per original sample')
-    parser.add_argument('-a --activesite', dest="activesite", action='store_true',
+    parser.add_argument('--activesite','-a', dest="activesite", action='store_true',
                         help="Toggle Active Site Data integration")
+    parser.add_argument('--invert','-i', dest="invert", action='store_true',
+                        help="This mode will mutate amino acids except the active sites")
     args = parser.parse_args()
-    main(args.path, args.n_sample_query, args.K_generate, args.model_name, args.activesite)
+    main(args.path, args.n_sample_query, args.K_generate, args.model_name, args.activesite, args.invert)
