@@ -39,6 +39,23 @@ def prepare_indices(start_ids, end_ids, device=device):
     end_idxs = torch.tensor(end_ids).to(device)
     return start_idxs, end_idxs    
 
+def remove_sublist(lst, sub):
+    for ele in sub:
+        try:
+            lst.remove(ele)
+        except:
+            print('Error: ', lst)
+            print(sub)
+
+    return lst
+
+def unique(list1):
+    # insert the list to the set
+    list_set = set(list1)
+    # convert the set to the list
+    unique_list = (list(list_set))
+    return unique_list
+
 def generate_sequences(df, K, model_name, act_site_on, invert):
     if model_name == 'OADM_640M':
         checkpoint = OA_DM_640M()
@@ -53,13 +70,20 @@ def generate_sequences(df, K, model_name, act_site_on, invert):
         start_ids = [[(x-1) for x in row] for row in df['Active site'].values.tolist()]
         end_ids = df['Active site'].values.tolist()
     else:
-        start_ids = [random.sample(range(0, len(sequences[i])), k=len(row)) for i, row in enumerate(df['Active site'].values.tolist())]
+        start_ids = [sorted(random.sample(range(0, len(sequences[i])), k=len(row))) for i, row in enumerate(df['Active site'].values.tolist())]
         end_ids = [[(x+1) for x in row] for row in start_ids]
     
-    if invert:
+    start_ids = [unique(row) for row in start_ids]
+    end_ids = [unique(row) for row in end_ids]
+    
+    if invert==1:
         temp = start_ids
         start_ids = [[0] + row for row in end_ids]
         end_ids = [row + [len(sequences[i])] for i,row in enumerate(temp)]
+    elif invert==2:
+        temp = [remove_sublist(list(range(0, len(sequences[i]))), start_ids[i]) for i in range(len(start_ids))]
+        start_ids = [sorted(random.sample(temp[i], k=len(row))) for i, row in enumerate(df['Active site'].values.tolist())]
+        end_ids = [[(x+1) for x in row] for row in start_ids]
     
     # Mask the sequences
     masked_sequences = mask_sequences(sequences, start_ids, end_ids)
@@ -122,7 +146,7 @@ if __name__== "__main__":
                         help ='Enter the number of protein sequences to generate per original sample')
     parser.add_argument('--activesite','-a', dest="activesite", action='store_true',
                         help="Toggle Active Site Data integration")
-    parser.add_argument('--invert','-i', dest="invert", action='store_true',
+    parser.add_argument('--invert','-i', dest="invert", type=int, default=0, choices=[0,1,2],
                         help="This mode will mutate amino acids except the active sites")
     args = parser.parse_args()
     main(args.path, args.n_sample_query, args.K_generate, args.model_name, args.activesite, args.invert)
